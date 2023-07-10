@@ -1,12 +1,21 @@
 {
-  "name": "hello-world-app",
-  "version": "1.0.0",
-  "description": "Hello, World! Application",
-  "main": "index.js",
-  "scripts": {
-    "start": "node index.js"
+  "apiVersion": "argoproj.io/v1alpha1",
+  "kind": "Application",
+  "metadata": {
+    "name": "hello-world-app",
+    "namespace": "argocd"
   },
-  "author": "Your Name",
-  "license": "MIT",
-  "dependencies": {}
+  "spec": {
+    "source": {
+      "repoURL": "https://github.com/Pankhuri79/Argocd-demo.git",
+      "path": "./"
+    },
+    "destination": {
+      "server": "https://192.168.49.2:8443",
+      "namespace": "argocd"
+    },
+    "syncPolicy": {
+      "automated": {}
+    }
+  }
 }
