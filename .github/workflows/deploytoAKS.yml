@@ -1,0 +1,48 @@
+name: Deploy to AKS
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  AZURE_RESOURCE_GROUP: ${{ secrets.AKS_RESOURCE_GROUP }}
+  AKS_CLUSTER_NAME: ${{ secrets.AKS_CLUSTER_NAME }}
+  DOCKER_IMAGE_NAME: ${{ secrets.DOCKER_IMAGE_NAME }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+    
+    - name: Install Azure CLI
+      run: |
+        curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+    
+    - name: Azure CLI Login
+      run: |
+        az login --service-principal -u ${{ secrets.AZURE_CLIENT_ID }} -p ${{ secrets.AZURE_CLIENT_SECRET }} --tenant ${{ secrets.AZURE_TENANT_ID }}
+    
+    - name: Set subscription
+      run: az account set --subscription ${{ env.AZURE_SUBSCRIPTION_ID }}
+    
+    - name: Docker login
+      run: |
+        docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }} docker.io
+    
+    - name: Build and push Docker image
+      run: |
+        docker build -t $DOCKER_IMAGE_NAME .
+        docker tag $DOCKER_IMAGE_NAME docker.io/$DOCKER_IMAGE_NAME
+        docker push docker.io/$DOCKER_IMAGE_NAME
+    
+    - name: Deploy to AKS
+      run: |
+        az aks get-credentials --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --name ${{ env.AKS_CLUSTER_NAME }}
+        kubectl apply -f k8/deployment.yaml
+        kubectl apply -f k8/svc.yaml
+        
