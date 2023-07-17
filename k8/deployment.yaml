@@ -12,6 +12,7 @@ spec:
       labels:
         app: hello-world-app
     spec:
+      dnsPolicy: Default  # Add this line to set the DNS policy
       containers:
         - name: hello-world-container
           image: pankhuri79/pankh79
