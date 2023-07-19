@@ -1,81 +1,56 @@
 const express = require('express');
+const promClient = require('prom-client');
+
 const app = express();
 const port = 8080;
 
-app.use(express.static(__dirname)); // Add this line to serve static files
+// Create custom metrics
+const httpRequestCounter = new promClient.Counter({
+  name: 'http_requests_total',
+  help: 'Total number of HTTP requests',
+  labelNames: ['method', 'route', 'status'],
+});
 
+const httpRequestDurationHistogram = new promClient.Histogram({
+  name: 'http_request_duration_seconds',
+  help: 'HTTP request duration histogram',
+  labelNames: ['method', 'route', 'status'],
+  buckets: [0.1, 0.5, 1, 2, 5],
+});
+
+// Middleware to collect metrics for each request
+app.use((req, res, next) => {
+  const start = Date.now();
+
+  // Add labels to the custom metrics
+  const labels = { method: req.method, route: req.path };
+
+  res.on('finish', () => {
+    const duration = (Date.now() - start) / 1000;
+    httpRequestDurationHistogram.observe(labels, duration);
+    httpRequestCounter.inc(labels);
+  });
+
+  next();
+});
+
+// Your application routes
 app.get('/', (req, res) => {
   const message = `
     <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <title>Testing App</title>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1">
-      <style>
-        body {
-          font-family: Arial, sans-serif;
-          background: url("image4.jpg") no-repeat center center fixed;
-          background-size: cover;
-          color: #333;
-          text-align: center;
-        }
-        h1 {
-          font-size: 48px;
-        }
-        .red {
-          color: #ff0000;
-        }
-        .green {
-          color: #00ff00;
-        }
-        .slideshow-container {
-          position: relative;
-          max-width: 100%;
-          margin: auto;
-        }
-        .slideshow-container img {
-          width: 100%;
-          height: auto;
-        }
-      </style>
-      <script>
-        // Slideshow JavaScript
-        let slideIndex = 0;
-        const showSlides = () => {
-          const slides = document.getElementsByClassName("mySlides");
-          for (let i = 0; i < slides.length; i++) {
-            slides[i].style.display = "none";
-          }
-          slideIndex++;
-          if (slideIndex > slides.length) {
-            slideIndex = 1;
-          }
-          slides[slideIndex - 1].style.display = "block";
-          setTimeout(showSlides, 2000); // Change slide every 2 seconds
-        };
-        document.addEventListener("DOMContentLoaded", showSlides);
-      </script>
-    </head>
-    <body>
-      <h1>Welcome to the <span class="Red">DevOps</span> <span class="Green">World</span> !!</h1>
-      <div class="slideshow-container">
-        <div class="mySlides">
-          <img src="image1.jpg" alt="Image 1">
-        </div>
-        <div class="mySlides">
-          <img src="image2.jpg" alt="Image 2">
-        </div>
-        <div class="mySlides">
-          <img src="image3.jpg" alt="Image 3">
-        </div>
-      </div>
-    </body>
-    </html>
+    <!-- Your existing HTML content -->
+    <!-- ... -->
   `;
   res.send(message);
 });
 
+// Expose metrics endpoint for Prometheus to scrape
+app.get('/metrics', (req, res) => {
+  res.set('Content-Type', promClient.register.contentType);
+  res.end(promClient.register.metrics());
+});
+
+// Start the server
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });
